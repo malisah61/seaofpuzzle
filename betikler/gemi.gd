@@ -15,6 +15,12 @@ var govde := 100.0   # gövde sağlığı (Tamir puzzle'ı onarır)
 var su := 0.0        # sintinedeki su (Pompa puzzle'ı boşaltır)
 var ruzgar := 55.0   # yelken gücü (Yelken puzzle'ı doldurur)
 var yapay_tayfa := true
+# Savaş jetonları (2. aşama): hareket jetonları Yelken'den, gülleler Top puzzle'ından gelir.
+const JETON_SINIR := 16
+const MERMI_SINIR := 12
+var hareket := 4
+var mermi := {"demir": 4, "zincir": 0, "ates": 0}
+var _tayfa_jeton := 0.0
 var renk := 4        # oyuncu: mavi yelkenli
 var _iz: Array = []  # [konum, yaş]
 var _iz_sayac := 0.0
@@ -28,6 +34,13 @@ func hedef_ver(p: Vector2) -> void:
 
 func hiz_carpani() -> float:
 	return (0.4 + 0.6 * ruzgar / 100.0) * (1.0 - 0.55 * su / 100.0) * (0.6 + 0.4 * govde / 100.0)
+
+
+func jeton_ekle(tur: String, n: int) -> void:
+	if tur == "hareket":
+		hareket = mini(JETON_SINIR, hareket + n)
+	elif mermi.has(tur):
+		mermi[tur] = mini(MERMI_SINIR, mermi[tur] + n)
 
 
 func hasar_ver(m: float) -> void:
@@ -47,6 +60,14 @@ func _process(delta: float) -> void:
 		ruzgar += 1.3 * delta
 		govde += 0.12 * delta
 		su -= 0.3 * delta
+		# Yapay tayfa savaş için yavaşça jeton biriktirir (en çok 4'e kadar).
+		_tayfa_jeton += delta
+		if _tayfa_jeton >= 7.0:
+			_tayfa_jeton = 0.0
+			if hareket < 4:
+				hareket += 1
+			if mermi.demir < 4:
+				mermi.demir += 1
 	ruzgar = clampf(ruzgar, 0.0, 100.0)
 	govde = clampf(govde, 0.0, 100.0)
 	su = clampf(su, 0.0, 100.0)

@@ -10,10 +10,13 @@ const HazineBetik := preload("res://betikler/hazineler.gd")
 const GemiBetik := preload("res://betikler/gemi.gd")
 const ArayuzBetik := preload("res://betikler/arayuz.gd")
 const SesBetik := preload("res://betikler/ses.gd")
+const KorsanBetik := preload("res://betikler/korsanlar.gd")
+const SavasBetik := preload("res://betikler/savas.gd")
 const PUZZLELER := {
 	"yelken": preload("res://betikler/puzzle/yelken.gd"),
 	"tamir": preload("res://betikler/puzzle/tamir.gd"),
 	"pompa": preload("res://betikler/puzzle/pompa.gd"),
+	"top": preload("res://betikler/puzzle/top.gd"),
 }
 
 var deniz: Node2D
@@ -28,6 +31,11 @@ var _paneller := {}
 var _carpisma_bekleme := 0.0
 var _limanda := false
 var ses: Node
+var korsanlar: Node2D
+var savas: Control
+var savasta := false
+var _savas_korsan: Dictionary = {}
+var son_savas_sonucu := ""
 
 
 func _ready() -> void:
@@ -53,6 +61,13 @@ func _ready() -> void:
 	gemi.position = deniz.baslangic_noktasi()
 	gemi.hasar_aldi.connect(_hasar_aldi)
 	add_child(gemi)
+
+	korsanlar = KorsanBetik.new()
+	korsanlar.deniz = deniz
+	korsanlar.gemi = gemi
+	korsanlar.kur()
+	korsanlar.saldiri.connect(savas_baslat)
+	add_child(korsanlar)
 
 	sis = SisBetik.new()
 	sis.deniz = deniz
@@ -124,6 +139,47 @@ func _katki(tur: String, miktar: float) -> void:
 			gemi.govde = clampf(gemi.govde + miktar, 0.0, 100.0)
 		"pompa":
 			gemi.su = clampf(gemi.su - miktar, 0.0, 100.0)
+		"hareket", "demir", "zincir", "ates":
+			gemi.jeton_ekle(tur, int(miktar))
+
+
+# --- Savaş (2. aşama) -------------------------------------------------------
+
+func savas_baslat(k: Dictionary, tohum := -1) -> void:
+	if savasta:
+		return
+	savasta = true
+	_savas_korsan = k
+	gemi.hareketli = false
+	korsanlar.etkin = false
+	ses.cal("carpma", -2.0)
+	savas = SavasBetik.new()
+	arayuz.add_child(savas)
+	arayuz.move_child(savas, 0)   # puzzle panelleri savaş tahtasının üstünde kalsın
+	arayuz.savas_modu(true)
+	savas.baslat(gemi, k, tohum)
+	savas.bitti.connect(savas_bitti)
+	savas.istasyon_istendi.connect(istasyon_ac)
+	istasyon_ac("top" if gemi.hareket >= 3 else "yelken")
+
+
+func savas_bitti(sonuc: String, ganimet: int) -> void:
+	if not savasta:
+		return
+	savasta = false
+	son_savas_sonucu = sonuc
+	savas.queue_free()
+	savas = null
+	arayuz.savas_modu(false)
+	korsanlar.etkin = true
+	istasyon_kapat()
+	if sonuc == "zafer":
+		altin += ganimet
+		korsanlar.batir(_savas_korsan)
+		ses.cal("altin")
+		arayuz.bildir("Zafer! Korsan battı, +" + str(ganimet) + " altın")
+	else:
+		_savas_korsan.bekleme = 30.0
 
 
 func _hasar_aldi(m: float) -> void:
@@ -133,7 +189,7 @@ func _hasar_aldi(m: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch and event.pressed:
+	if event is InputEventScreenTouch and event.pressed and not savasta:
 		var p: Vector2 = event.position
 		var ekran := get_viewport().get_visible_rect().size
 		if acik_istasyon != "" and p.x > ekran.x - panel_genisligi():
@@ -147,6 +203,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	# Panel açıkken gemi, görünen sol alanın ortasında kalsın
 	kamera.offset.x = lerpf(kamera.offset.x, panel_genisligi() / 2.0, minf(1.0, delta * 6.0))
+	if savasta:
+		return
 	if deniz.kesfet(gemi.position):
 		sis.queue_redraw()
 	var c: Dictionary = deniz.carpisma(gemi.position)
@@ -215,12 +273,57 @@ func _onizleme(klasor: String) -> void:
 	_paneller["pompa"].bot_hamle()
 	await _bekle(0.38)
 	await _goruntu(klasor, "4_pompa")
+	# 2. aşama: Top puzzle'ı, korsan, savaş tahtası
+	gemi.su = 10.0
+	istasyon_ac("top")
+	await _bekle(0.3)
+	_paneller["top"].bot_hamle()
+	await _bekle(0.9)
+	_paneller["top"].bot_hamle(false)
+	await _bekle(0.1)
+	await _goruntu(klasor, "5_top")
+	_paneller["top"].doldur()
+	istasyon_kapat()
+	var k: Dictionary = korsanlar.liste[1]
+	k.p = gemi.position + Vector2(330, -40)
+	k.aci = PI
+	k.bekleme = 0.0
+	await _bekle(0.35)
+	await _goruntu(klasor, "6_korsan")
+	gemi.jeton_ekle("hareket", 8)
+	gemi.jeton_ekle("demir", 4)
+	gemi.jeton_ekle("zincir", 1)
+	gemi.jeton_ekle("ates", 1)
+	savas_baslat(k, 7)
+	istasyon_kapat()
+	await _bekle(1.8)
+	savas.bot_plan()
+	await _bekle(0.2)
+	await _goruntu(klasor, "7_savas")
+	istasyon_ac("top")
+	# Görüntü için rakibi bordaya yakın bir yere koy
+	savas.rakip.p = Vector2i(7, 11)
+	savas.rakip.yon = 0
+	savas.rakip_plan = savas._planla(savas.rakip, savas.oyuncu.p, 4, ["demir", "zincir"])
+	for i in 4:
+		if savas.plan[i].h != "":
+			savas._slot_tikla(i, "orta")
+	savas.hareket_ekle("ileri")
+	savas.secili_mermi = "ates"
+	savas.atis_degistir(0, "sag")
+	savas.sure = 0.0
+	# Gülleler uçarken görüntü al
+	var bekleme := 0.0
+	while bekleme < 12.0 and not (savas.asama == "cozum" and savas._faz == 2 and not savas._toplar.is_empty() and savas._faz_t > 0.45):
+		await _bekle(0.03)
+		bekleme += 0.03
+	await _goruntu(klasor, "8_savas_atis")
 	get_tree().quit()
 
 
 func _test() -> void:
 	gemi.hedef_ver(gemi.position + Vector2(1500, 400))
-	for ad in ["yelken", "tamir", "pompa"]:
+	for ad in ["yelken", "tamir", "pompa", "top"]:
 		istasyon_ac(ad)
 		for i in 30:
 			_paneller[ad].bot_hamle()
@@ -228,5 +331,39 @@ func _test() -> void:
 		await _bekle(0.8)
 	istasyon_kapat()
 	await _bekle(1.0)
+	# Savaş testi: bot oyuncu korsanla savaşır (zaman 4 kat hızlı)
+	var mermi_once: int = gemi.mermi.demir + gemi.mermi.zincir + gemi.mermi.ates
+	print("TEST jetonlar: hareket=%d mermi=%s" % [gemi.hareket, str(gemi.mermi)])
+	Engine.time_scale = 4.0
+	gemi.govde = 100.0
+	var k: Dictionary = korsanlar.liste[0]
+	savas_baslat(k, 3)
+	var tur_sayisi := 0
+	var son_istatistik := {}
+	while savasta and tur_sayisi < 10:
+		await _bekle(0.3)
+		if not savasta:
+			break
+		son_istatistik = savas.istatistik.duplicate()
+		if savas.asama == "plan":
+			_paneller["yelken"].bot_hamle()
+			if not _paneller.has("top"):
+				istasyon_ac("top")
+			_paneller["top"].bot_hamle()
+			_paneller["top"].bot_hamle()
+			for ad in ["tamir", "pompa"]:
+				if _paneller.has(ad):
+					_paneller[ad].bot_hamle()
+			gemi.jeton_ekle("hareket", 3)   # test botu Yelken'de insan kadar hızlı değil
+			savas.bot_plan()
+			savas.sure = 0.0
+			tur_sayisi += 1
+	if savasta:
+		print("TEST savaş 10 turda bitmedi: rakip can=%.0f govde=%.0f atışlar=%s mermi=%s" % [savas.rakip.can, gemi.govde, str(savas.istatistik), str(gemi.mermi)])
+		savas_bitti("kacis", 0)
+	else:
+		print("TEST savaş bitti: sonuç=%s tur=%d altin=%d govde=%.0f atışlar=%s" % [son_savas_sonucu, tur_sayisi, altin, gemi.govde, str(son_istatistik)])
+	Engine.time_scale = 1.0
+	print("TEST korsan sayısı=%d ilk korsan=%s mermi_once=%d" % [korsanlar.liste.size(), str(korsanlar.liste[0].p.round()), mermi_once])
 	print("TEST TAMAM | govde=%.1f su=%.1f ruzgar=%.1f altin=%d konum=%s" % [gemi.govde, gemi.su, gemi.ruzgar, altin, str(gemi.position.round())])
 	get_tree().quit()

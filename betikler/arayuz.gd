@@ -41,6 +41,9 @@ class Gostergeler extends Control:
 		draw_circle(Vector2(24, 104), 9, Color(1, 0.8, 0.25))
 		draw_string(font, Vector2(40, 111), str(oyun.altin) + " altın", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 0.88, 0.45))
 		draw_string(font, Vector2(170, 111), "Hız %" + str(int(g.hiz_carpani() * 100)), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.85, 0.85, 0.85))
+		# Savaş jetonları: hareket (Yelken) ve gülleler (Top)
+		var m: Dictionary = g.mermi
+		draw_string(font, Vector2(14, 140), "Hareket %d   Gülle %d/%d/%d" % [g.hareket, m.demir, m.zincir, m.ates], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.95, 0.9, 0.6))
 
 
 class MiniHarita extends Control:
@@ -68,6 +71,10 @@ class MiniHarita extends Control:
 			for x in dz.sis_w:
 				if dz.acik[y * dz.sis_w + x] == 0:
 					draw_rect(Rect2(Vector2(x, y) * hs, hs + Vector2(0.5, 0.5)), Color(0.02, 0.05, 0.09, 0.9))
+		if oyun.korsanlar != null:
+			for k in oyun.korsanlar.liste:
+				if oyun.korsanlar.gorunur_mu(k):
+					draw_circle(k.p * olcek, 4.0, Color(0.95, 0.25, 0.2))
 		var g: Node2D = oyun.gemi
 		draw_circle(g.position * olcek, 4.5, Color(0.3, 1, 0.4))
 		if g.hareketli:
@@ -81,15 +88,15 @@ func kur(o: Node2D) -> void:
 	gostergeler = Gostergeler.new()
 	gostergeler.oyun = o
 	gostergeler.position = Vector2(16, 16)
-	gostergeler.size = Vector2(310, 124)
+	gostergeler.size = Vector2(310, 152)
 	gostergeler.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(gostergeler)
 
 	tuslar = VBoxContainer.new()
-	tuslar.position = Vector2(16, 156)
+	tuslar.position = Vector2(16, 180)
 	tuslar.add_theme_constant_override("separation", 10)
 	add_child(tuslar)
-	for bilgi in [["yelken", "Yelken"], ["tamir", "Tamir"], ["pompa", "Pompa"], ["top", "Top (yakında)"]]:
+	for bilgi in [["yelken", "Yelken"], ["tamir", "Tamir"], ["pompa", "Pompa"], ["top", "Top"]]:
 		var b := Button.new()
 		b.text = bilgi[1]
 		b.custom_minimum_size = Vector2(170, 62)
@@ -105,7 +112,6 @@ func kur(o: Node2D) -> void:
 			b.add_theme_stylebox_override(durum, sb)
 		b.add_theme_color_override("font_color", Color(1, 0.95, 0.84))
 		b.add_theme_color_override("font_disabled_color", Color(0.6, 0.55, 0.5))
-		b.disabled = bilgi[0] == "top"
 		var ad: String = bilgi[0]
 		b.pressed.connect(func(): istasyon_secildi.emit(ad))
 		tuslar.add_child(b)
@@ -125,6 +131,14 @@ func kur(o: Node2D) -> void:
 	bildirim.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bildirim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bildirim)
+
+
+## Savaş sırasında deniz göstergeleri gizlenir (savaş tahtası kendi arayüzünü çizer).
+func savas_modu(acik: bool) -> void:
+	gostergeler.visible = not acik
+	tuslar.visible = not acik
+	mini_harita.visible = not acik
+	bildirim.visible = not acik
 
 
 func istasyon_vurgula(ad: String) -> void:

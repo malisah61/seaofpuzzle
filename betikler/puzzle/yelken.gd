@@ -140,8 +140,10 @@ func _kilitle() -> void:
 		var odul: float = SIRA_ODULU[mini(dolu.size(), 4)]
 		puan += int(odul * 10)
 		katki.emit("ruzgar", odul)
+		# Savaş için hareket jetonu: her sıra 2, dörtlü "fırtına" 8 jeton
+		katki.emit("hareket", 8.0 if dolu.size() >= 4 else float(dolu.size() * 2))
 		if dolu.size() >= 4:
-			bildir("FIRTINA! Rüzgar +" + str(int(odul)))
+			bildir("FIRTINA! Rüzgar +" + str(int(odul)) + " · 8 jeton")
 		dusme_sure = maxf(0.22, 0.65 - satirlar * 0.012)
 	_yeni_parca()
 
@@ -260,6 +262,10 @@ func ciz() -> void:
 		metin(Vector2(sx, 548), "Rüzgar", 20, SOLUK)
 		draw_rect(Rect2(sx, 558, 136, 18), Color(0, 0, 0, 0.4))
 		draw_rect(Rect2(sx, 558, 136 * gemi.ruzgar / 100.0, 18), Color(0.95, 0.9, 0.6))
+		metin(Vector2(sx, 608), "Hareket jetonu", 18, SOLUK)
+		for i in mini(gemi.hareket, 16):
+			var jp := Vector2(sx + 8 + (i % 8) * 17, 626 + (i / 8) * 18)
+			draw_colored_polygon(PackedVector2Array([jp + Vector2(0, -7), jp + Vector2(6, 6), jp + Vector2(-6, 6)]), Color(0.95, 0.9, 0.6))
 
 
 ## Önizleme/test botu: rastgele birkaç hamle yapar.

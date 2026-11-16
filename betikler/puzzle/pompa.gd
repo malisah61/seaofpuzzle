@@ -22,6 +22,8 @@ var _imlec := Vector2i(-1, -1)
 var toplam := 0
 var ofs := PackedVector2Array()   # takas ve düşüş animasyonu için çizim kayması
 var _su_zaman := 0.0
+var _bos_sure := 0.0                 # hamlesiz geçen süre (ipucu için)
+var _ipucu := Vector2i(-1, -1)       # eşleşme yaratan takas (sol taş)
 const TASLAR := [["Yellow", "09"], ["Blue", "04"], ["Red", "12"], ["Green", "07"], ["Pink", "05"]]
 const KOMBO_SOZU := ["", "ÇAT!", "BAM!", "PAT!", "BUUM!"]
 const PARCACIK_TUR := ["sari", "mavi", "beyaz", "beyaz", "beyaz"]
@@ -90,6 +92,8 @@ func dokun(p: Vector2) -> void:
 
 func takas(x: int, y: int) -> void:
 	_imlec = Vector2i(x, y)
+	_bos_sure = 0.0
+	_ipucu = Vector2i(-1, -1)
 	var a := izgara[y * SUTUN + x]
 	izgara[y * SUTUN + x] = izgara[y * SUTUN + x + 1]
 	izgara[y * SUTUN + x + 1] = a
@@ -106,6 +110,11 @@ func takas(x: int, y: int) -> void:
 func _process(delta: float) -> void:
 	super._process(delta)
 	_su_zaman += delta
+	# İyileştirme: 5 sn hamle yapılmazsa olası bir takas yanıp söner
+	if visible and not _cozuluyor:
+		_bos_sure += delta
+		if _bos_sure > 5.0 and _ipucu.x < 0:
+			_ipucu = ipucu_bul()
 	for i in ofs.size():
 		if ofs[i] != Vector2.ZERO:
 			ofs[i] = ofs[i].move_toward(Vector2.ZERO, delta * H * 12.0)
@@ -197,6 +206,9 @@ func ciz() -> void:
 	if _cozuluyor:
 		for c in _silinecek:
 			draw_rect(Rect2(TAHTA + Vector2(c) * H, Vector2(H, H)).grow(-2), Color(1, 1, 0.8, 0.45))
+	if _ipucu.x >= 0 and not _cozuluyor:
+		var nabiz := 0.5 + 0.5 * sin(_su_zaman * 7.0)
+		draw_rect(Rect2(TAHTA + Vector2(_ipucu) * H, Vector2(H * 2, H)).grow(-1), Color(0.5, 1.0, 0.6, 0.35 + 0.5 * nabiz), false, 4.0)
 	if _imlec.x >= 0:
 		draw_rect(Rect2(TAHTA + Vector2(_imlec) * H, Vector2(H * 2, H)), Color(1, 0.9, 0.4), false, 3.0)
 	var sx := 392.0
@@ -210,6 +222,21 @@ func ciz() -> void:
 		var dolu: float = r.size.y * gemi.su / 100.0
 		draw_rect(Rect2(r.position.x, r.end.y - dolu, r.size.x, dolu), Color(0.25, 0.55, 0.85))
 		metin(Vector2(sx + 52, 540), "%" + str(int(gemi.su)), 22)
+
+
+## Eşleşme yaratan ilk takası bulur (yoksa -1,-1).
+func ipucu_bul() -> Vector2i:
+	for y in SATIR:
+		for x in SUTUN - 1:
+			var a := izgara[y * SUTUN + x]
+			izgara[y * SUTUN + x] = izgara[y * SUTUN + x + 1]
+			izgara[y * SUTUN + x + 1] = a
+			var var_mi := not _eslesmeleri_bul().is_empty()
+			izgara[y * SUTUN + x + 1] = izgara[y * SUTUN + x]
+			izgara[y * SUTUN + x] = a
+			if var_mi:
+				return Vector2i(x, y)
+	return Vector2i(-1, -1)
 
 
 ## Önizleme/test botu: eşleşme yaratan ilk takası yapar, yoksa rastgele takas.
