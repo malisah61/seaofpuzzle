@@ -20,6 +20,8 @@ const SEKILLER := [
 	[Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],  # J
 	[Vector2i(2, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],  # L
 ]
+const KENNEY := ["Grey", "Yellow", "Blue", "Red", "Green", "Pink", "Orange"]
+const SIRA_SOZU := ["", "HOP!", "ÇAT!", "BAM!", "BUUM!"]
 const SIRA_ODULU := [0.0, 10.0, 24.0, 40.0, 60.0]
 
 var izgara := PackedInt32Array()
@@ -118,7 +120,14 @@ func _kilitle() -> void:
 				break
 		if tam:
 			dolu.append(y)
+	ses_cal("dus", -6.0)
 	if not dolu.is_empty():
+		for y in dolu:
+			for x in range(0, SUTUN, 2):
+				parcacik_patlat(TAHTA + Vector2(x + 0.5, y + 0.5) * H, "beyaz" if dolu.size() < 3 else "sari", 3, 320.0)
+		patlama_yazisi(TAHTA + Vector2(SUTUN * H / 2.0, (dolu[0] + 0.5) * H), SIRA_SOZU[mini(dolu.size(), 4)])
+		ses_cal("kombo" if dolu.size() >= 3 else "eslesme")
+		ses_cal("yelken", -4.0)
 		_flas = dolu.duplicate()
 		_flas_sure = 0.18
 		for y in dolu:
@@ -131,7 +140,8 @@ func _kilitle() -> void:
 		var odul: float = SIRA_ODULU[mini(dolu.size(), 4)]
 		puan += int(odul * 10)
 		katki.emit("ruzgar", odul)
-		bildir(["", "Rüzgar +", "Çift sıra! +", "Üçlü sıra! +", "FIRTINA! +"][mini(dolu.size(), 4)] + str(int(odul)))
+		if dolu.size() >= 4:
+			bildir("FIRTINA! Rüzgar +" + str(int(odul)))
 		dusme_sure = maxf(0.22, 0.65 - satirlar * 0.012)
 	_yeni_parca()
 
@@ -153,6 +163,7 @@ func dokun(p: Vector2) -> void:
 	match tus_bul(p):
 		"dondur":
 			dondur()
+			ses_cal("tik", -8.0)
 			return
 		"sol":
 			_kaydir(Vector2i(-1, 0))
@@ -205,15 +216,24 @@ func ciz() -> void:
 		for x in SUTUN:
 			var t := izgara[y * SUTUN + x]
 			if t != -1:
-				hucre_ciz(Rect2(TAHTA + Vector2(x, y) * H, Vector2(H, H)), RENKLER[t])
+				tas_ciz(Rect2(TAHTA + Vector2(x, y) * H, Vector2(H, H)), KENNEY[t])
 	if _flas_sure > 0.0:
 		for y in _flas:
 			draw_rect(Rect2(TAHTA + Vector2(0, y * H), Vector2(SUTUN * H, H)), Color(1, 1, 0.8, _flas_sure * 4.0))
 	for c in _gorunen_dusme():
 		draw_rect(Rect2(TAHTA + Vector2(c) * H, Vector2(H, H)).grow(-3), Color(1, 1, 1, 0.12))
+	# Akıcı düşüş: parça bir alt sıraya inebiliyorsa zamanlayıcıya göre kaydırılarak çizilir
+	var kayma := 0.0
+	var alti_bos := true
+	for c in hucreler:
+		var a: Vector2i = c + Vector2i(0, 1)
+		if a.y >= SATIR or (a.y >= 0 and izgara[a.y * SUTUN + a.x] != -1):
+			alti_bos = false
+	if alti_bos:
+		kayma = clampf(_sayac / dusme_sure, 0.0, 1.0) * H
 	for c in hucreler:
 		if c.y >= 0:
-			hucre_ciz(Rect2(TAHTA + Vector2(c) * H, Vector2(H, H)), RENKLER[tip])
+			tas_ciz(Rect2(TAHTA + Vector2(c) * H + Vector2(0, kayma), Vector2(H, H)), KENNEY[tip])
 	# Yan sütun: tuşlar, sıradaki parça, rüzgar
 	var sx := 404.0
 	var r1 := Rect2(sx, 72, 136, 76)
@@ -233,7 +253,7 @@ func ciz() -> void:
 	tus_ekle(r5, "birak")
 	metin(Vector2(sx, 356), "Sıradaki", 20, SOLUK)
 	for c in SEKILLER[sonraki]:
-		hucre_ciz(Rect2(Vector2(sx + 14, 372) + Vector2(c) * 26.0, Vector2(26, 26)), RENKLER[sonraki])
+		tas_ciz(Rect2(Vector2(sx + 14, 372) + Vector2(c) * 26.0, Vector2(26, 26)), KENNEY[sonraki])
 	metin(Vector2(sx, 470), "Sıra: " + str(satirlar), 22)
 	metin(Vector2(sx, 500), "Puan: " + str(puan), 22)
 	if gemi != null:

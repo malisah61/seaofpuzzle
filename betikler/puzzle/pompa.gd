@@ -20,12 +20,19 @@ var _silinecek: Array = []
 var _kombo := 0
 var _imlec := Vector2i(-1, -1)
 var toplam := 0
+var ofs := PackedVector2Array()   # takas ve düşüş animasyonu için çizim kayması
+var _su_zaman := 0.0
+const TASLAR := [["Yellow", "09"], ["Blue", "04"], ["Red", "12"], ["Green", "07"], ["Pink", "05"]]
+const KOMBO_SOZU := ["", "ÇAT!", "BAM!", "PAT!", "BUUM!"]
+const PARCACIK_TUR := ["sari", "mavi", "beyaz", "beyaz", "beyaz"]
 
 
 func baslat() -> void:
 	baslik = "Pompa"
 	aciklama = "Taşa dokun: sağındakiyle yer değiştirir · 3+ aynı taş = su boşalır"
 	izgara.resize(SUTUN * SATIR)
+	ofs.resize(SUTUN * SATIR)
+	ofs.fill(Vector2.ZERO)
 	for y in SATIR:
 		for x in SUTUN:
 			izgara[y * SUTUN + x] = _eslesmeyen_tur(x, y)
@@ -86,6 +93,9 @@ func takas(x: int, y: int) -> void:
 	var a := izgara[y * SUTUN + x]
 	izgara[y * SUTUN + x] = izgara[y * SUTUN + x + 1]
 	izgara[y * SUTUN + x + 1] = a
+	ofs[y * SUTUN + x] = Vector2(H, 0)
+	ofs[y * SUTUN + x + 1] = Vector2(-H, 0)
+	ses_cal("tik", -6.0)
 	_kombo = 0
 	_silinecek = _eslesmeleri_bul()
 	if not _silinecek.is_empty():
@@ -95,6 +105,10 @@ func takas(x: int, y: int) -> void:
 
 func _process(delta: float) -> void:
 	super._process(delta)
+	_su_zaman += delta
+	for i in ofs.size():
+		if ofs[i] != Vector2.ZERO:
+			ofs[i] = ofs[i].move_toward(Vector2.ZERO, delta * H * 12.0)
 	if not _cozuluyor:
 		return
 	_adim_sayac -= delta
@@ -104,13 +118,21 @@ func _process(delta: float) -> void:
 		_cozuluyor = false
 		return
 	_kombo += 1
+	var orta := Vector2.ZERO
 	for c in _silinecek:
+		var tur := izgara[c.y * SUTUN + c.x]
+		if tur >= 0:
+			parcacik_patlat(TAHTA + (Vector2(c) + Vector2(0.5, 0.5)) * H, PARCACIK_TUR[tur], 3)
+		orta += Vector2(c)
 		izgara[c.y * SUTUN + c.x] = -1
+	orta /= float(_silinecek.size())
+	patlama_yazisi(TAHTA + (orta + Vector2(0.5, 0.5)) * H, KOMBO_SOZU[mini(_kombo, 4)], [Color(1, 0.8, 0.2), Color(1, 0.55, 0.2), Color(0.95, 0.3, 0.3), Color(0.6, 0.4, 1.0)][mini(_kombo, 4) - 1])
+	ses_cal("kombo" if _kombo >= 2 else "tas")
 	var miktar := _silinecek.size() * 1.3 * (1.0 + 0.5 * (_kombo - 1))
 	toplam += _silinecek.size()
 	puan += int(miktar * 10)
 	katki.emit("pompa", miktar)
-	if _kombo >= 2:
+	if _kombo >= 3:
 		bildir("Kombo x" + str(_kombo) + "!")
 	# Yerçekimi ve doldurma
 	for x in SUTUN:
@@ -119,9 +141,12 @@ func _process(delta: float) -> void:
 			var t := izgara[y * SUTUN + x]
 			if t != -1:
 				izgara[yaz * SUTUN + x] = t
+				ofs[yaz * SUTUN + x] = Vector2(0, -(yaz - y) * H)
 				yaz -= 1
+		var yeni := yaz + 1
 		for y in range(yaz, -1, -1):
 			izgara[y * SUTUN + x] = randi() % TUR_SAYISI
+			ofs[y * SUTUN + x] = Vector2(0, -yeni * H)
 	_silinecek = _eslesmeleri_bul()
 	_adim_sayac = 0.25
 
@@ -151,15 +176,24 @@ func ciz() -> void:
 	var alan := Rect2(TAHTA, Vector2(SUTUN * H, SATIR * H))
 	draw_rect(alan.grow(5), Color(0.3, 0.2, 0.1))
 	draw_rect(alan, Color(0.12, 0.1, 0.08))
-	# Su seviyesi: gemideki suya göre alt sıralar mavileşir
-	if gemi != null:
+	# Su seviyesi: gemideki suya göre alt sıralar suya gömülür (dalgalı yüzey)
+	if gemi != null and gemi.su > 0.5:
 		var su_yuk: float = SATIR * H * gemi.su / 100.0
-		draw_rect(Rect2(TAHTA + Vector2(0, SATIR * H - su_yuk), Vector2(SUTUN * H, su_yuk)), Color(0.15, 0.4, 0.65, 0.45))
+		var ust: float = TAHTA.y + SATIR * H - su_yuk
+		var dalga := PackedVector2Array()
+		for i in 13:
+			var dx := SUTUN * H * i / 12.0
+			dalga.append(Vector2(TAHTA.x + dx, ust + sin(_su_zaman * 3.0 + i * 0.9) * 4.0))
+		dalga.append(TAHTA + Vector2(SUTUN * H, SATIR * H))
+		dalga.append(TAHTA + Vector2(0, SATIR * H))
+		draw_colored_polygon(dalga, Color(0.2, 0.5, 0.8, 0.45))
 	for y in SATIR:
 		for x in SUTUN:
 			var t := izgara[y * SUTUN + x]
-			if t >= 0:
-				_tas_ciz(TAHTA + Vector2(x + 0.5, y + 0.5) * H, t)
+			var k: Vector2 = TAHTA + Vector2(x, y) * H + ofs[y * SUTUN + x]
+			if t >= 0 and k.y > TAHTA.y - H * 0.6:
+				var a := clampf((k.y - (TAHTA.y - H * 0.6)) / (H * 0.6), 0.0, 1.0)
+				tas_ciz(Rect2(k + Vector2(5, 5), Vector2(H - 10, H - 10)), TASLAR[t][0], TASLAR[t][1], a)
 	if _cozuluyor:
 		for c in _silinecek:
 			draw_rect(Rect2(TAHTA + Vector2(c) * H, Vector2(H, H)).grow(-2), Color(1, 1, 0.8, 0.45))

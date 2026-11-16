@@ -7,8 +7,17 @@
 - Var olan özellikleri silme; geliştir. Telefon performansı öncelikli (takılma, donma olmamalı).
 - Sahneler kodla kurulur (`oyun.tscn` sadece kök düğüm). Yeni puzzle'lar `betikler/puzzle/puzzle_taban.gd`'den türetilir ve `katki(tur, miktar)` sinyaliyle gemiye bağlanır.
 
+## Görsel yön ve ücretsiz varlıklar
+- Hedef his: Puzzle Pirates gibi renkli, canlı, çizgi film tarzı; puzzle'lar parlak taşlı ve **animasyonlu** (kayan/düşen taşlar, parıltı parçacıkları, "ÇAT! BAM! BUUM!" tarzı çizgi roman patlamaları, ses efektleri). Kullanıcı bunu özellikle istedi.
+- Varlıklar `varliklar/` klasöründe, hepsi **Kenney CC0** (lisans: `varliklar/LISANS.md`). Yükleme `betikler/varlik.gd` ile (`V.doku("gemiler/gemi_05.png")`, `V.karo(70)`, `V.font()`), sesler `betikler/ses.gd` (`ses_cal("eslesme")`).
+- Yeni varlık gerekirse önce Kenney aynasına bak: `git clone --depth 1 https://github.com/ETdoFresh/kenney.nl` (opengameart/kenney.nl bu ortamdan erişilemez, github.com erişilebilir). Orada Pirate Pack, Pirate Kit (3D), Puzzle Pack 1-2, Particle/Smoke, UI Pack, Fonts, Impact/Interface/RPG sesleri, Music Jingles, Toon Characters, Modular Characters ve daha fazlası var. Sadece gereken dosyaları kopyala, depoyu şişirme; LISANS.md'yi güncelle.
+- Sadece CC0 (veya açıkça serbest) varlık kullan; Puzzle Pirates/Seafight görselleri asla kullanılmaz.
+- Gemi sprite'ları: `gemi_NN.png`, renk r (0 beyaz,1 siyah,2 kırmızı,3 yeşil,4 mavi,5 sarı) → sağlam r+1, hasarlı r+7, ağır hasarlı r+13, batık r+19. Pruva aşağı bakar (-90° döndür).
+- Adalar Kenney 9 dilim karolarıyla kurulur (`deniz.gd` CIMLI/KUMLU/SIG). Kenney Future fontunda Türkçe harf yok ve "K" harfi "H" gibi okunur: sadece K içermeyen patlama sözlerinde kullan, başlık/isimlerde varsayılan fontu kullan.
+- Gelecek hedefi: Puzzle Pirates'taki gibi izometrik **güverte görünümü** (tayfa karakterleri istasyonlarda çalışırken) — Kenney Pirate Kit 3D modelleri izometrik kamerayla render edilebilir ya da Toon/Modular Characters kullanılabilir.
+
 ## Yapı
-- `betikler/oyun.gd` ana oyun, `deniz.gd` harita, `gemi.gd` gemi sistemleri, `arayuz.gd` HUD, `sis.gd`, `hazineler.gd`, `su.gdshader`
+- `betikler/varlik.gd` varlık yükleyici, `ses.gd` ses yöneticisi, `oyun.gd` ana oyun, `deniz.gd` harita, `gemi.gd` gemi sistemleri, `arayuz.gd` HUD, `sis.gd`, `hazineler.gd`, `su.gdshader`
 - `betikler/puzzle/` — `yelken.gd` (tetris), `tamir.gd` (yama yerleştirme), `pompa.gd` (yatay takaslı eşleştirme)
 
 ## Test (göndermeden önce mutlaka)

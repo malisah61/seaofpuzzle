@@ -9,6 +9,7 @@ const SisBetik := preload("res://betikler/sis.gd")
 const HazineBetik := preload("res://betikler/hazineler.gd")
 const GemiBetik := preload("res://betikler/gemi.gd")
 const ArayuzBetik := preload("res://betikler/arayuz.gd")
+const SesBetik := preload("res://betikler/ses.gd")
 const PUZZLELER := {
 	"yelken": preload("res://betikler/puzzle/yelken.gd"),
 	"tamir": preload("res://betikler/puzzle/tamir.gd"),
@@ -26,9 +27,12 @@ var acik_istasyon := ""
 var _paneller := {}
 var _carpisma_bekleme := 0.0
 var _limanda := false
+var ses: Node
 
 
 func _ready() -> void:
+	ses = SesBetik.new()
+	add_child(ses)
 	var su := ColorRect.new()
 	su.size = DUNYA
 	var mat := ShaderMaterial.new()
@@ -92,6 +96,7 @@ func istasyon_ac(ad: String) -> void:
 		return
 	if acik_istasyon != "":
 		_paneller[acik_istasyon].visible = false
+	ses.cal("ac", -8.0)
 	if not _paneller.has(ad):
 		var p: Control = PUZZLELER[ad].new()
 		p.gemi = gemi
@@ -123,6 +128,7 @@ func _katki(tur: String, miktar: float) -> void:
 
 func _hasar_aldi(m: float) -> void:
 	if m >= 5.0:
+		ses.cal("carpma", -4.0)
 		arayuz.bildir("Kayalığa çarptın! Gövde -" + str(int(m)))
 
 
@@ -135,6 +141,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if arayuz.ekran_dolu(p):
 			return
 		gemi.hedef_ver(get_canvas_transform().affine_inverse() * p)
+		ses.cal("tik", -12.0)
 
 
 func _process(delta: float) -> void:
@@ -154,6 +161,7 @@ func _process(delta: float) -> void:
 	var kazanc: int = deniz.hazine_topla(gemi.position)
 	if kazanc > 0:
 		altin += kazanc
+		ses.cal("altin")
 		arayuz.bildir("Hazine! +" + str(kazanc) + " altın")
 	var limanda: bool = deniz.limanda_mi(gemi.position)
 	if limanda:
@@ -187,8 +195,8 @@ func _goruntu(klasor: String, ad: String) -> void:
 func _onizleme(klasor: String) -> void:
 	if not klasor.is_absolute_path():
 		klasor = ProjectSettings.globalize_path("res://").path_join(klasor)
-	gemi.hedef_ver(gemi.position + Vector2(900, -250))
-	await _bekle(3.0)
+	gemi.hedef_ver(gemi.position + Vector2(-60, -420))
+	await _bekle(2.5)
 	await _goruntu(klasor, "1_deniz")
 	istasyon_ac("yelken")
 	for i in 7:
@@ -199,13 +207,13 @@ func _onizleme(klasor: String) -> void:
 	istasyon_ac("tamir")
 	await _bekle(0.3)
 	_paneller["tamir"].bot_hamle()
-	await _bekle(0.3)
+	await _bekle(0.12)
 	await _goruntu(klasor, "3_tamir")
 	gemi.su = 45.0
 	istasyon_ac("pompa")
 	await _bekle(0.3)
 	_paneller["pompa"].bot_hamle()
-	await _bekle(0.1)
+	await _bekle(0.38)
 	await _goruntu(klasor, "4_pompa")
 	get_tree().quit()
 

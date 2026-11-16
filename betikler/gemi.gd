@@ -4,6 +4,8 @@ extends Node2D
 
 signal hasar_aldi(miktar: float)
 
+const V := preload("res://betikler/varlik.gd")
+const OLCEK := 0.85
 const HIZ_TABAN := 175.0
 const DONUS_HIZI := 2.4
 
@@ -13,6 +15,7 @@ var govde := 100.0   # gövde sağlığı (Tamir puzzle'ı onarır)
 var su := 0.0        # sintinedeki su (Pompa puzzle'ı boşaltır)
 var ruzgar := 55.0   # yelken gücü (Yelken puzzle'ı doldurur)
 var yapay_tayfa := true
+var renk := 4        # oyuncu: mavi yelkenli
 var _iz: Array = []  # [konum, yaş]
 var _iz_sayac := 0.0
 var _zaman := 0.0
@@ -74,38 +77,18 @@ func _draw() -> void:
 		var yas: float = nokta[1]
 		var p := to_local(nokta[0])
 		draw_circle(p, 6.0 + yas * 14.0, Color(1, 1, 1, 0.35 * (1.0 - yas / 1.6)))
-	var sallanma := sin(_zaman * 2.0) * 1.5
-	var batma := su / 100.0 * 4.0
-	# Gölge
-	draw_colored_polygon(PackedVector2Array([Vector2(-34, -8), Vector2(26, -8), Vector2(44, 6), Vector2(26, 20), Vector2(-34, 20), Vector2(-40, 6)]), Color(0, 0, 0, 0.22))
-	# Gövde
-	var govde_rengi := Color(0.48, 0.29, 0.14).lerp(Color(0.25, 0.16, 0.1), 1.0 - govde / 100.0)
-	var gv := PackedVector2Array([Vector2(-38, -14), Vector2(22, -14), Vector2(44, 0), Vector2(22, 14), Vector2(-38, 14), Vector2(-42, 0)])
-	draw_colored_polygon(gv, govde_rengi)
-	draw_colored_polygon(PackedVector2Array([Vector2(-33, -9), Vector2(20, -9), Vector2(35, 0), Vector2(20, 9), Vector2(-33, 9)]), Color(0.72, 0.55, 0.33))
-	for x in [-24, -12, 0, 12]:
-		draw_line(Vector2(x, -9), Vector2(x, 9), Color(0.6, 0.44, 0.25), 1.0)
-	# Sudaki çizgi (su aldıkça gövde kararır)
-	if batma > 0.5:
-		draw_polyline(gv + PackedVector2Array([gv[0]]), Color(0.1, 0.35, 0.55, batma / 4.0), 3.0)
-	# Hasar çatlakları
-	if govde < 60.0:
-		draw_line(Vector2(-20, -14), Vector2(-14, -6), Color(0.1, 0.05, 0.02), 2.0)
-		draw_line(Vector2(6, 14), Vector2(12, 5), Color(0.1, 0.05, 0.02), 2.0)
+	# Kenney gemi sprite'ı: pruva aşağı baktığı için -90° döndürülür.
+	# Renk: 0 beyaz, 1 siyah, 2 kırmızı, 3 yeşil, 4 mavi, 5 sarı. Hasar arttıkça görüntü değişir.
+	var seviye := 0
 	if govde < 30.0:
-		draw_line(Vector2(-30, 8), Vector2(-22, 2), Color(0.1, 0.05, 0.02), 2.0)
-	# Direkler ve yelkenler (rüzgar dolduğunda şişer)
-	var siskinlik := 4.0 + ruzgar / 100.0 * 12.0
-	for mx in [-12.0, 12.0]:
-		var yelken := PackedVector2Array()
-		for i in 9:
-			var t := float(i) / 8.0
-			var yy := lerpf(-26.0, 26.0, t)
-			yelken.append(Vector2(mx + sin(t * PI) * siskinlik + sallanma * 0.3, yy))
-		yelken.append(Vector2(mx - 2, 26))
-		yelken.append(Vector2(mx - 2, -26))
-		draw_colored_polygon(yelken, Color(0.97, 0.94, 0.86))
-		draw_line(Vector2(mx - 2, -27), Vector2(mx - 2, 27), Color(0.35, 0.22, 0.1), 3.0)
-		draw_circle(Vector2(mx - 2, 0), 3.5, Color(0.35, 0.22, 0.1))
-	# Bayrak
-	draw_colored_polygon(PackedVector2Array([Vector2(-40, -2), Vector2(-54, -6 + sallanma), Vector2(-54, 4 + sallanma)]), Color(0.8, 0.15, 0.15))
+		seviye = 2
+	elif govde < 65.0:
+		seviye = 1
+	var t: Texture2D = V.doku("gemiler/gemi_%02d.png" % (renk + 1 + seviye * 6))
+	var sallanma := sin(_zaman * 2.0) * 0.04
+	var renk_tonu := Color(1, 1, 1).lerp(Color(0.6, 0.75, 0.95), su / 100.0 * 0.6)
+	draw_set_transform(Vector2(4, 6), -PI / 2.0 + sallanma, Vector2(OLCEK, OLCEK))
+	draw_texture(t, -t.get_size() / 2.0, Color(0, 0, 0, 0.22))
+	draw_set_transform(Vector2.ZERO, -PI / 2.0 + sallanma, Vector2(OLCEK, OLCEK))
+	draw_texture(t, -t.get_size() / 2.0, renk_tonu)
+	draw_set_transform(Vector2.ZERO)

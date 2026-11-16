@@ -58,10 +58,11 @@ class MiniHarita extends Control:
 			return
 		var dz: Node2D = oyun.deniz
 		var olcek: Vector2 = size / dz.boyut
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.22, 0.36, 0.9))
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.3, 0.58, 0.78, 0.92))
 		for a in dz.adalar:
 			if dz.acik_mi(a.merkez):
-				draw_circle(a.merkez * olcek, maxf(3.0, a.r * olcek.x), Color(0.85, 0.78, 0.5) if not a.liman else Color(0.95, 0.6, 0.35))
+				var ar: Rect2 = a.rect
+				draw_rect(Rect2(ar.position * olcek, ar.size * olcek), Color(0.95, 0.6, 0.35) if a.liman else Color(0.85, 0.78, 0.5))
 		var hs: Vector2 = 200.0 * olcek
 		for y in dz.sis_h:
 			for x in dz.sis_w:

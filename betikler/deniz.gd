@@ -38,7 +38,7 @@ func olustur(b: Vector2) -> void:
 		var kr := _rng.randf_range(16.0, 34.0)
 		var km := Vector2(_rng.randf_range(150, boyut.x - 150), _rng.randf_range(150, boyut.y - 150))
 		if _bos_mu(km, kr + 160.0) and km.distance_to(baslangic_noktasi()) > 500.0:
-			kayaliklar.append({"merkez": km, "r": kr})
+			kayaliklar.append({"merkez": km, "r": 22.0, "karo": [49, 50, 51][_rng.randi() % 3], "aci": _rng.randf() * TAU})
 	deneme = 0
 	while hazineler.size() < 32 and deneme < 3000:
 		deneme += 1
@@ -62,30 +62,67 @@ func _bos_mu(m: Vector2, mesafe: float) -> bool:
 	return true
 
 
-func _halka(m: Vector2, r: float, oran: float, titresim: float, n: int) -> PackedVector2Array:
-	var p := PackedVector2Array()
-	for i in n:
-		var aci := TAU * float(i) / float(n)
-		var rr := r * oran * _rng.randf_range(1.0 - titresim, 1.0 + titresim)
-		p.append(m + Vector2.RIGHT.rotated(aci) * rr)
-	return p
+const K := 64.0
+const V := preload("res://betikler/varlik.gd")
+# Kenney Pirate Pack karo numaraları (9 dilim)
+const CIMLI := {"sol_ust": 6, "ust": [7, 8], "sag_ust": 9, "sol": [22, 38], "orta": [23, 24, 39, 40], "sag": [25, 41], "sol_alt": 54, "alt": [55, 56], "sag_alt": 57}
+const KUMLU := {"sol_ust": 1, "ust": [2], "sag_ust": 3, "sol": [17], "orta": [18, 4, 20], "sag": [19], "sol_alt": 33, "alt": [34], "sag_alt": 35}
+const SIG := {"sol_ust": 10, "ust": [11], "sag_ust": 12, "sol": [26], "orta": [27], "sag": [28], "sol_alt": 42, "alt": [43], "sag_alt": 44}
+
+
+func _secim(kume: Dictionary, x: int, y: int, w: int, h: int) -> int:
+	var anahtar := "orta"
+	if y == 0:
+		anahtar = "sol_ust" if x == 0 else ("sag_ust" if x == w - 1 else "ust")
+	elif y == h - 1:
+		anahtar = "sol_alt" if x == 0 else ("sag_alt" if x == w - 1 else "alt")
+	elif x == 0:
+		anahtar = "sol"
+	elif x == w - 1:
+		anahtar = "sag"
+	var v = kume[anahtar]
+	if v is Array:
+		return v[_rng.randi() % v.size()]
+	return v
 
 
 func _ada(m: Vector2, r: float, ad: String, liman: bool) -> Dictionary:
-	var palmiyeler: Array = []
-	for i in int(r / 60.0) + 2:
-		palmiyeler.append(m + Vector2.RIGHT.rotated(_rng.randf() * TAU) * _rng.randf_range(0.0, r * 0.5))
+	var w := clampi(int(round(r / 55.0)), 3, 8)
+	var h := clampi(int(round(r / 55.0 * _rng.randf_range(0.7, 1.1))), 3, 7)
+	var kose := (m - Vector2(w, h) * K / 2.0).snapped(Vector2(K, K))
+	var rect := Rect2(kose, Vector2(w, h) * K)
+	var kume := CIMLI if (w >= 4 and h >= 4) else KUMLU
+	var karolar: Array = []
+	for y in h:
+		for x in w:
+			karolar.append([kose + Vector2(x, y) * K, _secim(kume, x, y, w, h)])
+	var sig: Array = []
+	for y in h + 2:
+		for x in w + 2:
+			sig.append([kose + Vector2(x - 1, y - 1) * K, _secim(SIG, x, y, w + 2, h + 2)])
+	var suslar: Array = []
+	for y in range(1, h - 1):
+		for x in range(1, w - 1):
+			var zar := _rng.randf()
+			var p := kose + (Vector2(x, y) + Vector2(_rng.randf_range(0.3, 0.7), _rng.randf_range(0.3, 0.7))) * K
+			if zar < 0.35:
+				suslar.append([p, [70, 71, 72][_rng.randi() % 3], _rng.randf_range(0.8, 1.15), _rng.randf() * TAU])
+			elif zar < 0.45:
+				suslar.append([p, [65, 66, 67][_rng.randi() % 3], 0.8, _rng.randf() * TAU])
+			elif zar < 0.6 and kume == CIMLI:
+				suslar.append([p, [87, 88][_rng.randi() % 2], 1.0, _rng.randf() * TAU])
+	if liman:
+		suslar.append([kose + Vector2(1.5, 1.5) * K, 14, 1.0, 0.0])
 	return {
-		"merkez": m, "r": r, "ad": ad, "liman": liman,
-		"sig": _halka(m, r, 1.35, 0.08, 18),
-		"kum": _halka(m, r, 1.0, 0.12, 16),
-		"cim": _halka(m, r, 0.74, 0.14, 14),
-		"palmiyeler": palmiyeler,
+		"merkez": rect.get_center(), "r": rect.size.length() / 2.0, "rect": rect, "ad": ad, "liman": liman,
+		"karolar": karolar, "sig": sig, "suslar": suslar,
+		"iskele": rect.position + Vector2(w * K, floor(h / 2.0) * K),
 	}
 
 
 func baslangic_noktasi() -> Vector2:
-	return adalar[0].merkez + Vector2(adalar[0].r + 160.0, 0.0)
+	var r: Rect2 = adalar[0].rect
+	return Vector2(r.end.x + 230.0, r.get_center().y + 90.0)
 
 
 ## Gemi çevresindeki sisi açar. Yeni hücre açıldıysa true döner.
@@ -118,10 +155,21 @@ func carpisma(p: Vector2) -> Dictionary:
 	var itme := Vector2.ZERO
 	var hasar := 0.0
 	for a in adalar:
-		var d: Vector2 = p - a.merkez
-		var sinir: float = a.r * 1.12
-		if d.length() < sinir:
-			itme += d.normalized() * (sinir - d.length())
+		var r: Rect2 = a.rect.grow(18.0)
+		if r.has_point(p):
+			var sol := p.x - r.position.x
+			var sag := r.end.x - p.x
+			var ust := p.y - r.position.y
+			var alt := r.end.y - p.y
+			var en_az := minf(minf(sol, sag), minf(ust, alt))
+			if en_az == sol:
+				itme.x -= sol
+			elif en_az == sag:
+				itme.x += sag
+			elif en_az == ust:
+				itme.y -= ust
+			else:
+				itme.y += alt
 	for k in kayaliklar:
 		var d2: Vector2 = p - k.merkez
 		var sinir2: float = k.r + 20.0
@@ -141,34 +189,40 @@ func hazine_topla(p: Vector2) -> int:
 
 func limanda_mi(p: Vector2) -> bool:
 	for a in adalar:
-		if a.liman and p.distance_to(a.merkez) < a.r + 240.0:
+		if a.liman and (a.rect as Rect2).grow(240.0).has_point(p):
 			return true
 	return false
+
+
+func _karo_ciz(no: int, p: Vector2) -> void:
+	draw_texture_rect(V.karo(no), Rect2(p, Vector2(K, K)), false)
 
 
 func _draw() -> void:
 	var font := ThemeDB.fallback_font
 	for a in adalar:
-		draw_colored_polygon(a.sig, Color(0.35, 0.75, 0.82, 0.35))
-		draw_colored_polygon(a.kum, Color(0.89, 0.80, 0.56))
-		draw_colored_polygon(a.cim, Color(0.30, 0.58, 0.28))
-		for pm in a.palmiyeler:
-			draw_circle(pm + Vector2(4, 5), 15.0, Color(0, 0, 0, 0.18))
-			draw_circle(pm, 15.0, Color(0.18, 0.45, 0.20))
-			draw_circle(pm + Vector2(-4, -4), 7.0, Color(0.32, 0.62, 0.30))
+		for k in a.sig:
+			_karo_ciz(k[1], k[0])
+	for a in adalar:
 		if a.liman:
-			var iskele: Vector2 = a.merkez + Vector2(a.r * 0.85, -14.0)
-			draw_rect(Rect2(iskele, Vector2(110, 28)), Color(0.45, 0.30, 0.16))
-			for i in 5:
-				draw_line(iskele + Vector2(i * 22 + 10, 0), iskele + Vector2(i * 22 + 10, 28), Color(0.32, 0.20, 0.10), 2.0)
-			draw_circle(a.merkez + Vector2(-a.r * 0.2, -a.r * 0.2), 22.0, Color(0.75, 0.35, 0.25))
-			draw_circle(a.merkez + Vector2(a.r * 0.15, -a.r * 0.3), 18.0, Color(0.85, 0.75, 0.55))
+			for i in 3:
+				_karo_ciz(76, a.iskele + Vector2(i * K, 0))
+		for k in a.karolar:
+			_karo_ciz(k[1], k[0])
+		for su in a.suslar:
+			var t: Texture2D = V.karo(su[1])
+			draw_set_transform(su[0], su[3], Vector2(su[2], su[2]))
+			draw_texture(t, -t.get_size() / 2.0)
+		draw_set_transform(Vector2.ZERO)
 		var yazi: String = a.ad
 		var gen := font.get_string_size(yazi, HORIZONTAL_ALIGNMENT_LEFT, -1, 26).x
-		var yp: Vector2 = a.merkez + Vector2(-gen / 2.0, a.r + 52.0)
-		draw_string(font, yp + Vector2(2, 2), yazi, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(0, 0, 0, 0.5))
-		draw_string(font, yp, yazi, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(1, 0.96, 0.85))
+		var r: Rect2 = a.rect
+		var yp := Vector2(r.get_center().x - gen / 2.0, r.end.y + K + 34.0)
+		draw_string_outline(font, yp, yazi, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, 7, Color(0.08, 0.2, 0.3, 0.85))
+		draw_string(font, yp, yazi, HORIZONTAL_ALIGNMENT_LEFT, -1, 26, Color(1, 0.97, 0.88))
 	for k in kayaliklar:
-		draw_circle(k.merkez, k.r + 14.0, Color(0.85, 0.95, 1.0, 0.25))
-		draw_circle(k.merkez, k.r, Color(0.36, 0.36, 0.38))
-		draw_circle(k.merkez + Vector2(-k.r * 0.3, -k.r * 0.3), k.r * 0.45, Color(0.5, 0.5, 0.52))
+		var t: Texture2D = V.karo(k.karo)
+		draw_circle(k.merkez, 34.0, Color(1, 1, 1, 0.18))
+		draw_set_transform(k.merkez, k.aci, Vector2.ONE)
+		draw_texture(t, -t.get_size() / 2.0)
+		draw_set_transform(Vector2.ZERO)

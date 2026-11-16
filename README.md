@@ -14,6 +14,9 @@ Her `main` güncellemesinde GitHub Actions APK'yı derler. **Releases → "Sea o
 - **Pompa:** taşa dokun, sağındakiyle yer değiştirsin; 3+ aynı taş → sintinedeki su boşalır.
 - Boş istasyonları yapay zekâ tayfa yavaşça çalıştırır; sen oynarsan çok daha etkili olur.
 
+## Görseller
+Tüm görseller, font ve sesler Kenney'nin ücretsiz CC0 paketlerinden (bkz. `varliklar/LISANS.md`). Teşekkürler, [Kenney.nl](https://www.kenney.nl)!
+
 ## Ekran görüntüleri
 | Deniz | Yelken | Tamir | Pompa |
 |---|---|---|---|

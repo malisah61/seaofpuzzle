@@ -118,6 +118,7 @@ func dokun(p: Vector2) -> void:
 			if secili == i:
 				tepsi[i] = _dondur(tepsi[i])
 			secili = i
+			ses_cal("tik", -6.0)
 			return
 	var alan := Rect2(TAHTA, Vector2(N * H, N * H))
 	if not alan.has_point(p) or secili == -1:
@@ -131,8 +132,15 @@ func dokun(p: Vector2) -> void:
 		for c in sekil:
 			hedefler.append(c + konum)
 		if _tam_oturur_mu(hedefler):
+			var orta := Vector2.ZERO
 			for q in hedefler:
 				tahta[q.y * N + q.x] = -1
+				orta += Vector2(q)
+			orta = TAHTA + (orta / float(hedefler.size()) + Vector2(0.5, 0.5)) * H
+			parcacik_patlat(orta, "beyaz", 10, 300.0)
+			patlama_yazisi(orta, ["TAP!", "ÇAT!", "TAP TAP!"][randi() % 3], Color(0.95, 0.7, 0.35))
+			ses_cal("cekic")
+			ses_cal("tahta", -6.0)
 			puan += hedefler.size() * 10
 			katki.emit("tamir", hedefler.size() * 3.0)
 			tepsi[secili] = null
@@ -142,11 +150,13 @@ func dokun(p: Vector2) -> void:
 				bolum += 1
 				katki.emit("tamir", 6.0)
 				bildir("Gövde onarıldı! +6")
+				ses_cal("basari", -4.0)
 				_yeni_govde()
 			return
 	# Uymadı
 	_hata_hucreler = [hucre]
 	_hata_sure = 0.4
+	ses_cal("hata", -6.0)
 	katki.emit("tamir", -0.5)
 
 
