@@ -31,3 +31,21 @@
 **Test:** `--deneme` artık Top puzzle'ını ve bot oyuncuyla tam bir korsan savaşını oynatır (atış/isabet istatistiği yazar). `--onizleme` yeni 4 görüntü üretir: `5_top`, `6_korsan`, `7_savas`, `8_savas_atis`.
 
 **Sırada (2. aşamanın kalanı):** harpunla avlanan deniz canavarları, kanca + rampa blok düellosu (kombolar rakibe engel blok gönderir), savaştan kaçış, ses efektleri için Kenney top/patlama sesleri.
+
+## 2026-11-17 (gece) — 2. aşama devam: rampa düellosu, deniz canavarları, kaçış
+**Analiz 1 — oyuncu deneyimi.** Savaş tek bir yoldan bitiyordu: top atışıyla can eritmek. Botla 10 turda bile bitmeyen uzun savaşlar sıkıcılaşıyordu; kaçmak mümkün değildi, yakın mesafenin özel bir anlamı yoktu. Denizde de tek tehdit korsanlardı; Top'taki üç gülle türü aynı amaca hizmet ediyordu. Savaş sonunda ne olduğunu (isabet, ganimet) görmek zordu ve vuruşlar "hissedilmiyordu" (hasar sayısı, sarsıntı, top sesi yoktu).
+**Analiz 2 — örnek oyunlar.** Puzzle Pirates'ta gemiler yan yana gelince kanca atılır ve tayfalar kılıç düellosuna girer: düşen ikili blokları "kırıcı" taşlarla patlatıp rakibe engel blok yağdırırsın; deniz savaşı böylece iki aşamalı olur. Seafight'ta ise korsanlardan ayrı olarak avlanan deniz canavarları vardır ve özel mühimmat ister; ganimet döngüsünü çeşitlendirir. İki oyunda da kaçış (haritanın kenarına kaçmak) önemli bir taktik seçenektir.
+
+**Yeni (2. aşamadan 3 özellik)**
+- **Rampa düellosu** (`betikler/puzzle/duello.gd`, `puzzle_taban`'dan türedi, `katki("duello", ±1)`): rakibe bitişikken (çapraz dahil) savaş tahtasındaki **Kanca** tuşu parlar. Sağ panelde 6x12 blok düellosu açılır: ikili taşlar düşer, YILDIZ taş değdiği aynı renk grubu kırar, zincirleme kırılmalar kombo olur. Kırdıkların rakibe gri **engel taşı** gönderir (gelen engelle karşılıklı iptal edilir), engeller yanında grup kırılınca dağılır. Yığını tepeye ulaşan kaybeder; 75 sn sonunda tahtası boş olan kazanır. Kazanırsan korsan **teslim olur** (ganimet x1.5), kaybedersen tayfan püskürtülür (gövde -10) ve 2 tur kanca atılamaz. Güçlü korsanlar (güç 2+) de bitişik gelince %35 ihtimalle kanca atar. Kontroller: Sol/Döndür/Sağ/Düşür tuşları ya da tahtaya dokunma (kenarlar kaydırır, orta döndürür); hayalet parça düşeceği yeri gösterir. Rakip yapay zekâsı tüm yerleşimleri dener, güce göre hızlanır.
+- **Deniz canavarları ve harpun** (`betikler/canavarlar.gd`): 2 özgün, kodla çizilmiş canavar türü (Derin Yılanı, Dev Ahtapot), denizde 4 tane; yaklaşan gemiyi kovalar ve saldırır, mini haritada mor nokta. Savaş tahtasında canavar gülle atmaz, dibine girip **ısırır** (ahtapot ayrıca kollarıyla sarıp bir sonraki tur bir hamleni çalar). Top puzzle'ına 4. mühimmat **Harpun** (2 yük) eklendi: gemilere zayıf (4), canavara 4 kat (16) işler; diğer gülleler canavara azaltılmış işler. Avlanan canavar 120-270 altın verir, 90 sn sonra daha güçlü çıkar.
+- **Savaştan kaçış:** tahtanın kenarından dışarı sürersen savaş "kaçış" ile biter; rakip 30 sn peşine düşmez, gemi rakipten uzaklaşmış olarak denize döner.
+
+**İyileştirmeler (3)**
+- Savaş hissi: uçan hasar sayıları, oyuncu vurulunca ekran sarsıntısı, Kenney top atışı / kanca / ısırma / kılıç sesleri (Impact Sounds + RPG Audio, CC0).
+- Savaş sonu özet kartı: sonuç (Zafer / Teslim oldular / Av tamam / Kaçtın / Yenilgi), tur, atış/isabet yüzdesi, aldığın isabet, kalan gövde, ganimet.
+- Top puzzle'ı: 5 sn hamle yapılmazsa uzun bir zincir yeşil yanıp sönerek ipucu verir; mühimmat listesi 4 türe göre yeniden düzenlendi.
+
+**Test:** `--deneme` artık kaçışı (sonuç=kacis), kanca + bot düellosunu (zafer → teslim) ve harpunla canavar avını (4 turda zafer) da oynatır. `--onizleme` 4 yeni görüntü: `9_duello`, `10_savas_ozet`, `11_canavar`, `12_canavar_savas`.
+
+**Sırada:** 2. aşamanın kapanışı (düello için tayfa animasyonu, canavarlara özel ganimet/eşya, korsan filoları), ardından 3. aşama: Nakama ile online deniz.

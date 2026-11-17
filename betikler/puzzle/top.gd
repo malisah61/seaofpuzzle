@@ -9,7 +9,8 @@ const SATIR := 8
 const H := 58.0
 const TAHTA := Vector2(24, 80)
 const TUR_ADI := ["Barut", "Gülle", "Fitil"]
-const MERMILER := [["demir", "Demir", 1], ["zincir", "Zincir", 2], ["ates", "Ateşli", 2]]
+const MERMILER := [["demir", "Demir", 1], ["zincir", "Zincir", 2], ["ates", "Ateşli", 2], ["harpun", "Harpun", 2]]
+const IPUCU_SURE := 5.0
 const ZINCIR_SOZU := ["", "", "", "BUM!", "BAM!", "BAM!", "BUUM!", "BUUM!"]
 
 var izgara := PackedInt32Array()
@@ -20,6 +21,8 @@ var secili := 0                 # MERMILER indeksi
 var artik := 0                  # bir sonraki gülleye aktarılan yük
 var dolan := 0
 var _zaman := 0.0
+var _bosta := 0.0              # hamle yapılmayan süre (ipucu için)
+var _ipucu: Array = []         # önerilen zincir (tahta değişince silinir)
 
 
 func baslat() -> void:
@@ -70,6 +73,8 @@ func dokun(p: Vector2) -> void:
 		return
 	var c := _hucre(p)
 	if c.x >= 0:
+		_bosta = 0.0
+		_ipucu.clear()
 		zincir = [c]
 		_surukluyor = true
 		ses_cal("tik", -10.0)
@@ -126,6 +131,8 @@ func doldur() -> void:
 		bildir("+" + str(adet) + " " + str(m[1]) + " gülle")
 	puan += zincir.size() * 15
 	zincir.clear()
+	_ipucu.clear()
+	_bosta = 0.0
 	_dusur()
 	_karistir_gerekirse()
 
@@ -193,6 +200,11 @@ func _ara(yol: Array, yeter: int) -> Array:
 func _process(delta: float) -> void:
 	super._process(delta)
 	_zaman += delta
+	# İpucu: 5 sn hamle yoksa uzun bir zincir yanıp söner (yalnız panel görünürken, bir kez hesaplanır)
+	if visible and not _surukluyor:
+		_bosta += delta
+		if _bosta >= IPUCU_SURE and _ipucu.is_empty():
+			_ipucu = en_uzun_zincir(6)
 	for i in ofs.size():
 		if ofs[i] != Vector2.ZERO:
 			ofs[i] = ofs[i].move_toward(Vector2.ZERO, delta * H * 12.0)
@@ -242,6 +254,15 @@ func ciz() -> void:
 			var k: Vector2 = TAHTA + Vector2(x, y) * H + ofs[y * SUTUN + x]
 			if t >= 0 and k.y > TAHTA.y - H * 0.5:
 				_parca_ciz(k, t, zincirde.has(Vector2i(x, y)))
+	# İpucu zinciri (yanıp söner)
+	if not _ipucu.is_empty() and zincir.is_empty():
+		var a := 0.35 + 0.35 * sin(_zaman * 6.0)
+		var ip := PackedVector2Array()
+		for c in _ipucu:
+			var k: Vector2 = TAHTA + Vector2(c) * H
+			draw_rect(Rect2(k + Vector2(3, 3), Vector2(H - 6, H - 6)), Color(0.4, 1.0, 0.5, a), false, 4.0)
+			ip.append(k + Vector2(H, H) / 2.0)
+		draw_polyline(ip, Color(0.4, 1.0, 0.5, a * 0.8), 4.0)
 	# Zincir çizgisi
 	if zincir.size() >= 2:
 		var pts := PackedVector2Array()
@@ -259,17 +280,17 @@ func ciz() -> void:
 	metin(Vector2(sx, 280), "Zincir", 18, SOLUK)
 	metin(Vector2(sx, 306), str(zincir.size()) + " / " + str(zincir.size() / 3) + " yük", 18)
 	metin(Vector2(sx, 350), "Mühimmat", 18, SOLUK)
-	for i in 3:
-		var r := Rect2(sx, 362 + i * 62, 100, 54)
+	for i in MERMILER.size():
+		var r := Rect2(sx, 360 + i * 54, 100, 48)
 		tus_ciz(r, "", i == secili)
 		tus_ekle(r, "mermi" + str(i))
-		metin(r.position + Vector2(8, 22), MERMILER[i][1], 17, Color(1, 0.9, 0.5) if i == secili else YAZI)
+		metin(r.position + Vector2(8, 20), MERMILER[i][1], 17, Color(1, 0.9, 0.5) if i == secili else YAZI)
 		var stok: int = gemi.mermi[MERMILER[i][0]] if gemi != null else 0
-		metin(r.position + Vector2(8, 44), "x" + str(stok) + "  (" + str(MERMILER[i][2]) + " yük)", 15, SOLUK)
-	metin(Vector2(sx, 570), "Artık: " + str(artik), 17, SOLUK)
+		metin(r.position + Vector2(8, 40), "x" + str(stok) + "  (" + str(MERMILER[i][2]) + " yük)", 15, SOLUK)
+	metin(Vector2(sx, 600), "Artık: " + str(artik), 17, SOLUK)
 	metin(Vector2(24, 584), "Dolan gülle: " + str(dolan) + "    Puan: " + str(puan), 20)
 	metin(Vector2(24, 614), "Uzun zincir = bonus yük (6+: +1, 9+: +2)", 17, SOLUK)
-	metin(Vector2(24, 640), "Zincir gülle yelken yırtar, ateşli gülle yakar.", 17, SOLUK)
+	metin(Vector2(24, 640), "Zincir yelken yırtar, ateşli yakar, harpun canavar avlar.", 17, SOLUK)
 
 
 func _parca_ciz_kucuk(k: Vector2, t: int) -> void:

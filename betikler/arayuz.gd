@@ -43,7 +43,7 @@ class Gostergeler extends Control:
 		draw_string(font, Vector2(170, 111), "Hız %" + str(int(g.hiz_carpani() * 100)), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.85, 0.85, 0.85))
 		# Savaş jetonları: hareket (Yelken) ve gülleler (Top)
 		var m: Dictionary = g.mermi
-		draw_string(font, Vector2(14, 140), "Hareket %d   Gülle %d/%d/%d" % [g.hareket, m.demir, m.zincir, m.ates], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.95, 0.9, 0.6))
+		draw_string(font, Vector2(14, 140), "Hareket %d   Gülle %d/%d/%d  Harpun %d" % [g.hareket, m.demir, m.zincir, m.ates, m.harpun], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(0.95, 0.9, 0.6))
 
 
 class MiniHarita extends Control:

@@ -1,7 +1,7 @@
 extends Node
 ## Basit ses yöneticisi: "ses" grubundaki bu düğüme cal("ad") ile ulaşılır.
 
-const SESLER := ["tik", "eslesme", "kombo", "hata", "dus", "ac", "cekic", "tahta", "tas", "carpma", "altin", "yelken", "gicirti", "basari"]
+const SESLER := ["tik", "eslesme", "kombo", "hata", "dus", "ac", "cekic", "tahta", "tas", "carpma", "altin", "yelken", "gicirti", "basari", "top", "kanca", "kilic", "kesik", "isirma"]
 var _akislar := {}
 var _calarlar: Array = []
 var _sira := 0

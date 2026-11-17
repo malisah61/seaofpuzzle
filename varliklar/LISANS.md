@@ -8,6 +8,6 @@ Bu klasördeki tüm görseller, fontlar ve sesler **Kenney (www.kenney.nl)** tar
 | puzzle/, parcacik/ | Puzzle Pack 2 |
 | duman/ | Smoke Particles |
 | font/ | Kenney Fonts |
-| ses/ | Interface Sounds, Impact Sounds, RPG Audio, Music Jingles |
+| ses/ | Interface Sounds, Impact Sounds, RPG Audio, Music Jingles (top, kanca: Impact Sounds; kilic, kesik, isirma: RPG Audio) |
 
 Kopyalar şu GitHub aynasından alındı: https://github.com/ETdoFresh/kenney.nl

@@ -19,7 +19,8 @@
 ## Yapı
 - `betikler/varlik.gd` varlık yükleyici, `ses.gd` ses yöneticisi, `oyun.gd` ana oyun, `deniz.gd` harita, `gemi.gd` gemi sistemleri, `arayuz.gd` HUD, `sis.gd`, `hazineler.gd`, `su.gdshader`
 - `betikler/puzzle/` — `yelken.gd` (tetris), `tamir.gd` (yama yerleştirme), `pompa.gd` (yatay takaslı eşleştirme), `top.gd` (barut-gülle-fitil zinciri)
-- `betikler/savas.gd` 16x16 turlu savaş tahtası (oyuncu canı = `gemi.govde`, jetonlar `gemi.hareket` / `gemi.mermi`), `korsanlar.gd` denizdeki NPC korsanlar (`saldiri` sinyali → `oyun.savas_baslat`)
+- `betikler/savas.gd` 16x16 turlu savaş tahtası (oyuncu canı = `gemi.govde`, jetonlar `gemi.hareket` / `gemi.mermi`), `korsanlar.gd` denizdeki NPC korsanlar (`saldiri` sinyali → `oyun.savas_baslat`), `canavarlar.gd` deniz canavarları (aynı sinyal, `canavar: true`; `canavar_ciz` statik çizim)
+- `betikler/puzzle/duello.gd` rampa düellosu (savaşta kanca → `oyun.duello_baslat`, sonuç `katki("duello", ±1)`)
 
 ## Test (göndermeden önce mutlaka)
 ```
@@ -27,7 +28,7 @@ godot --headless --path . --editor --quit          # içe aktar, parse hatası v
 godot --headless --path . -- --deneme              # "TEST TAMAM" yazmalı
 xvfb-run -a -s "-screen 0 1280x720x24" godot --path . --rendering-driver opengl3 --resolution 1280x720 -- --onizleme=onizleme
 ```
-Son komut `onizleme/` klasörüne 8 ekran görüntüsü yazar; görüntülere bakıp kontrol et ve depoya ekle.
+Son komut `onizleme/` klasörüne 12 ekran görüntüsü yazar; görüntülere bakıp kontrol et ve depoya ekle.
 
 ## Derleme
 `main`'e her push'ta `.github/workflows/android.yml` APK derler ve `son-surum` sürümüne yükler.

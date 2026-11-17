@@ -5,9 +5,13 @@ extends Control
 ## kayalar gövdeye zarar verir. Bordadan atılan gülleler 3 kare menzillidir.
 ## Mühimmat: Demir (9 hasar), Zincir (5 hasar + yelken yırtar: rakip sonraki tur 1 hamle eksik), Ateşli (6 + 2 tur yanma).
 ## Oyuncunun canı gemi gövdesidir: savaş sürerken Tamir ve Pompa puzzle'ları hayati önemdedir.
+## Harpun (Top'ta doldurulur) gemilere zayıf ama deniz canavarlarına 4 kat etkilidir; canavar gülle atmaz, yanına gelince ısırır.
+## Rakip gemiye bitişikken KANCA atılırsa Rampa Düellosu (blok düellosu) başlar: kazanan savaşı bitirir.
+## Tahtanın kenarından dışarı sürersen savaştan KAÇARSIN.
 
 signal bitti(sonuc: String, ganimet: int)
 signal istasyon_istendi(ad: String)
+signal duello_istendi(ad: String, guc: int)
 
 const V := preload("res://betikler/varlik.gd")
 const N := 16
@@ -20,9 +24,12 @@ const SU := 0
 const KAYA := 1
 const RUZGAR := 2
 const GIRDAP := 3
-const MERMI_HASAR := {"demir": 9.0, "zincir": 5.0, "ates": 6.0}
-const MERMI_ADI := {"demir": "Demir", "zincir": "Zincir", "ates": "Ateşli"}
-const MERMI_RENK := {"demir": Color(0.2, 0.2, 0.22), "zincir": Color(0.55, 0.6, 0.7), "ates": Color(1.0, 0.45, 0.15)}
+const MERMI_HASAR := {"demir": 9.0, "zincir": 5.0, "ates": 6.0, "harpun": 4.0}
+const MERMI_ADI := {"demir": "Demir", "zincir": "Zincir", "ates": "Ateşli", "harpun": "Harpun"}
+const MERMI_RENK := {"demir": Color(0.2, 0.2, 0.22), "zincir": Color(0.55, 0.6, 0.7), "ates": Color(1.0, 0.45, 0.15), "harpun": Color(0.85, 0.7, 0.45)}
+const MERMILER := ["demir", "zincir", "ates", "harpun"]
+const CANAVAR_CARPAN := {"demir": 0.6, "zincir": 0.5, "ates": 0.8, "harpun": 4.0}   # canavara karşı hasar çarpanı
+const CanavarBetik := preload("res://betikler/canavarlar.gd")
 const FAZ_SURE := [0.5, 0.3, 0.55]
 const ISTASYONLAR := [["yelken", "Yelken"], ["top", "Top"], ["tamir", "Tamir"], ["pompa", "Pompa"]]
 
@@ -54,6 +61,11 @@ var _tuslar: Array = []
 var _rng := RandomNumberGenerator.new()
 var istatistik := {"oyuncu_atis": 0, "oyuncu_isabet": 0, "rakip_atis": 0, "rakip_isabet": 0}
 var _su_zemin: ColorRect
+var canavar_mi := false         # rakip bir deniz canavarı mı?
+var _kacti := false
+var _teslim := false            # rampa düellosu kazanıldı
+var _kanca_tur := 0             # bu turdan önce yeniden kanca atılamaz
+var _sarsinti := 0.0
 
 
 func _ready() -> void:
@@ -86,14 +98,17 @@ func baslat(g: Node2D, k: Dictionary, tohum := -1) -> void:
 	else:
 		_rng.randomize()
 	_harita_kur()
+	canavar_mi = bool(k.get("canavar", false))
 	var can := 50.0 + 15.0 * float(k.get("guc", 1))
+	if canavar_mi:
+		can = 70.0 + 20.0 * float(k.get("guc", 1))
 	oyuncu = {"p": Vector2i(3, 12), "yon": 0, "yirtik": 0, "yanma": 0, "kare": []}
 	rakip = {"p": Vector2i(12, 3), "yon": 2, "yirtik": 0, "yanma": 0, "kare": [], "can": can, "can_max": can}
 	_cizim_sifirla()
 	tur = 1
 	sonuc = ""
 	_tur_baslat()
-	mesaj("SAVAŞ! " + str(k.get("ad", "Korsan")))
+	mesaj(("CANAVAR! " if canavar_mi else "SAVAŞ! ") + str(k.get("ad", "Korsan")))
 
 
 func _harita_kur() -> void:
@@ -173,6 +188,53 @@ func _tur_baslat() -> void:
 			s.yanma -= 1
 			_hasar(s, 3.0)
 			_yazilar.append({"p": _merkez(s.p), "metin": "YANIYOR", "yas": 0.0, "renk": Color(1, 0.5, 0.15)})
+	_rakip_kanca_dene()
+
+
+## Bitişikteyken (çapraz dahil) kanca atılabilir; canavara kanca atılmaz.
+func kanca_mumkun() -> bool:
+	if canavar_mi or asama != "plan" or tur < _kanca_tur:
+		return false
+	return absi(oyuncu.p.x - rakip.p.x) <= 1 and absi(oyuncu.p.y - rakip.p.y) <= 1
+
+
+func kanca_at() -> bool:
+	if not kanca_mumkun():
+		mesaj("Kanca için rakibe bitişik ol")
+		_ses("hata", -6.0)
+		return false
+	_duello_baslat("KANCA! Rampaya!")
+	return true
+
+
+## Güçlü korsanlar da bitişik gelince kanca atabilir.
+func _rakip_kanca_dene() -> void:
+	if canavar_mi or int(korsan.get("guc", 1)) < 2 or tur < _kanca_tur:
+		return
+	if absi(oyuncu.p.x - rakip.p.x) <= 1 and absi(oyuncu.p.y - rakip.p.y) <= 1 and _rng.randf() < 0.35:
+		_duello_baslat("Korsanlar kanca attı!")
+
+
+func _duello_baslat(m: String) -> void:
+	asama = "duello"
+	mesaj(m)
+	_ses("kanca")
+	duello_istendi.emit(str(korsan.get("ad", "Korsan")), int(korsan.get("guc", 1)))
+
+
+## Rampa düellosu bitti: kazanırsan rakip teslim olur, kaybedersen tayfan geri püskürtülür.
+func duello_bitti(kazandi: bool) -> void:
+	if asama != "duello":
+		return
+	_kanca_tur = tur + 2
+	if kazandi:
+		_teslim = true
+		rakip.can = 0.0
+		_bitti_mi()
+	else:
+		asama = "plan"
+		_hasar(oyuncu, 10.0)
+		mesaj("Rampa püskürtüldü!")
 
 
 func hamle_hakki() -> int:
@@ -204,6 +266,8 @@ func _tikla(p: Vector2) -> void:
 		return
 	elif ad == "hazir":
 		sure = 0.0
+	elif ad == "kanca":
+		kanca_at()
 	elif ad in ["sol", "ileri", "sag"]:
 		hareket_ekle(ad)
 	elif ad.begins_with("slot"):
@@ -323,6 +387,7 @@ func _konum_puani(p: Vector2i, yon: int, hedef: Vector2i) -> float:
 ## Her adımda bordaya hedef gelmesi ödüllenir; kayaya çarpmak cezalandırılır. mermi: kullanılabilecek gülleler.
 func _planla(s: Dictionary, hedef: Vector2i, hak: int, mermi: Array) -> Array:
 	var secenek := ["", "ileri", "sol", "sag"]
+	var av := canavar_mi and s == rakip   # canavar: bordaya değil, dibine girmeye çalışır
 	var en_iyi_dizi: Array = ["", "", "", ""]
 	var en_iyi_puan := -INF
 	for kod in 256:
@@ -346,9 +411,15 @@ func _planla(s: Dictionary, hedef: Vector2i, hak: int, mermi: Array) -> Array:
 			yon = r.yon
 			if r.carpti:
 				puan -= 5.0
-			if _atis_izi(p, yon, "sol", hedef).isabet or _atis_izi(p, yon, "sag", hedef).isabet:
+			if av:
+				if absi(p.x - hedef.x) <= 1 and absi(p.y - hedef.y) <= 1:
+					puan += 6.0
+			elif _atis_izi(p, yon, "sol", hedef).isabet or _atis_izi(p, yon, "sag", hedef).isabet:
 				puan += 6.0
-		puan += _konum_puani(p, yon, hedef) - absi(p.x - hedef.x) * 0.2 - absi(p.y - hedef.y) * 0.2
+		if av:
+			puan -= (absi(p.x - hedef.x) + absi(p.y - hedef.y)) * 1.5
+		else:
+			puan += _konum_puani(p, yon, hedef) - absi(p.x - hedef.x) * 0.2 - absi(p.y - hedef.y) * 0.2
 		puan += _rng.randf() * 1.5 - hamle * 0.1
 		if puan > en_iyi_puan:
 			en_iyi_puan = puan
@@ -381,6 +452,8 @@ func _planla(s: Dictionary, hedef: Vector2i, hak: int, mermi: Array) -> Array:
 func _rakip_mermi() -> Array:
 	var guc := int(korsan.get("guc", 1))
 	var liste: Array = []
+	if canavar_mi:
+		return liste
 	for i in 1 + guc:
 		var m := "demir"
 		if guc >= 2 and _rng.randf() < 0.3:
@@ -396,7 +469,7 @@ func bot_plan() -> void:
 	if asama != "plan":
 		return
 	var mermi: Array = []
-	for m in ["ates", "zincir", "demir"]:
+	for m in (["harpun", "ates", "demir", "zincir"] if canavar_mi else ["ates", "zincir", "demir", "harpun"]):
 		for i in gemi.mermi[m]:
 			mermi.append(m)
 	var bp := _planla(oyuncu, rakip.p, mini(hamle_hakki(), gemi.hareket), mermi)
@@ -415,6 +488,11 @@ func bot_plan() -> void:
 
 func _process(delta: float) -> void:
 	_zaman += delta
+	if _sarsinti > 0.0:
+		_sarsinti = maxf(0.0, _sarsinti - delta)
+		position = Vector2(_rng.randf_range(-1, 1), _rng.randf_range(-1, 1)) * 14.0 * _sarsinti
+	elif position != Vector2.ZERO:
+		position = Vector2.ZERO
 	if _mesaj_sure > 0.0:
 		_mesaj_sure -= delta
 	for i in range(_patlamalar.size() - 1, -1, -1):
@@ -434,6 +512,8 @@ func _process(delta: float) -> void:
 			_faz_t += delta / FAZ_SURE[_faz]
 			if _faz_t >= 1.0:
 				_faz_bitir()
+		"duello":
+			pass   # düello paneli sürerken tahta bekler
 		"son":
 			_son_sure -= delta
 			if _son_sure <= 0.0:
@@ -515,6 +595,8 @@ func _hareket_coz(ho: String, hr: String) -> void:
 				continue
 			var s: Dictionary = gemiler[g]
 			var q: Vector2i = istek[g]
+			if g == 0 and not _icinde(q):
+				_kacti = true   # kenardan dışarı: kaçış
 			if _tur(q) == KAYA:
 				durdu[g] = true
 				istek[g] = null
@@ -590,12 +672,24 @@ func _atis_coz() -> void:
 				istatistik[kim + "_isabet"] += 1
 			ses_var = true
 	if ses_var:
-		_ses("carpma", -10.0)
+		_ses("top", -4.0)
+	# Canavar ısırığı: dibindeki gemiye
+	if canavar_mi and absi(oyuncu.p.x - rakip.p.x) <= 1 and absi(oyuncu.p.y - rakip.p.y) <= 1:
+		_hasar(oyuncu, 5.0 + float(korsan.get("guc", 1)))
+		istatistik.rakip_isabet += 1
+		var orta := (_merkez(oyuncu.p) + _merkez(rakip.p)) / 2.0
+		_yazilar.append({"p": orta, "metin": "HAM!", "yas": 0.0, "renk": Color(0.85, 0.5, 1.0)})
+		if str(korsan.get("tur", "")) == "ahtapot":
+			oyuncu.yirtik = 1   # kollarıyla sarar: sonraki tur bir hamle eksik
+		_ses("isirma", -2.0)
 
 
 func _isabet(t: Dictionary) -> void:
 	var hedef: Dictionary = t.hedef
-	_hasar(hedef, MERMI_HASAR[t.tur])
+	var m: float = MERMI_HASAR[t.tur]
+	if canavar_mi and hedef == rakip:
+		m *= CANAVAR_CARPAN[t.tur]
+	_hasar(hedef, m)
 	_patlamalar.append({"p": t.son, "yas": 0.0, "buyuk": true})
 	var soz := "BAM!"
 	match t.tur:
@@ -605,8 +699,10 @@ func _isabet(t: Dictionary) -> void:
 		"ates":
 			hedef.yanma = 2
 			soz = "BUUM!"
+		"harpun":
+			soz = "ZIIP!"
 	_yazilar.append({"p": t.son + Vector2(0, -20), "metin": soz, "yas": 0.0, "renk": MERMI_RENK[t.tur].lightened(0.3)})
-	_ses("carpma", -2.0)
+	_ses("top", 0.0)
 
 
 func _hasar(s: Dictionary, m: float) -> void:
@@ -614,26 +710,39 @@ func _hasar(s: Dictionary, m: float) -> void:
 		m *= 0.6 + 0.2 * float(korsan.get("guc", 1))   # zayıf korsanlar daha az vurur
 		gemi.govde = maxf(0.0, gemi.govde - m)
 		gemi.su = minf(100.0, gemi.su + m * 0.4)
+		_sarsinti = clampf(m * 0.04, 0.12, 0.4)
 	else:
 		s.can = maxf(0.0, s.can - m)
+	# Uçan hasar sayısı
+	_yazilar.append({"p": _merkez(s.p) + Vector2(18, -14), "metin": "-" + str(int(round(m))), "yas": 0.0,
+		"renk": Color(1, 0.45, 0.4) if s == oyuncu else Color(1, 0.95, 0.6)})
 
 
 func _bitti_mi() -> bool:
 	if rakip.can <= 0.0:
 		sonuc = "zafer"
 		ganimet = 60 + 40 * int(korsan.get("guc", 1)) + _rng.randi_range(0, 40)
-		mesaj("ZAFER! +" + str(ganimet) + " altın")
+		if canavar_mi:
+			ganimet = 120 + 50 * int(korsan.get("guc", 1)) + _rng.randi_range(0, 50)
+		if _teslim:
+			ganimet = int(ganimet * 1.5)   # teslim alınan gemi: ambar da senin
+		mesaj(("AV TAMAM! +" if canavar_mi else ("TESLİM OLDULAR! +" if _teslim else "ZAFER! +")) + str(ganimet) + " altın")
 		_ses("basari")
 	elif gemi.govde <= 0.0:
 		sonuc = "yenilgi"
 		ganimet = 0
 		mesaj("Gemin battı...")
 		_ses("hata")
+	elif _kacti:
+		sonuc = "kacis"
+		ganimet = 0
+		mesaj("Kaçtın! Rüzgar seninle")
+		_ses("yelken")
 	else:
 		return false
 	asama = "son"
-	_mesaj_sure = 3.0
-	_son_sure = 2.8
+	_mesaj_sure = 1.2
+	_son_sure = 3.6
 	return true
 
 
@@ -773,7 +882,11 @@ func _draw() -> void:
 		draw_set_transform(_merkez(p), _aci(yon), Vector2(0.38, 0.38))
 		draw_texture(tt, -tt.get_size() / 2.0, Color(1, 1, 1, 0.3))
 		draw_set_transform(Vector2.ZERO)
-	_gemi_ciz(rakip, int(korsan.get("renk", 2)), rakip.can / rakip.can_max)
+	if canavar_mi:
+		var co := _kare_ornek(rakip)
+		CanavarBetik.canavar_ciz(self, str(korsan.get("tur", "yilan")), co[0], co[1] + PI / 2.0, 0.42, _zaman, rakip.can / rakip.can_max)
+	else:
+		_gemi_ciz(rakip, int(korsan.get("renk", 2)), rakip.can / rakip.can_max)
 	_gemi_ciz(oyuncu, 4, gemi.govde / 100.0)
 	# Uçan gülleler
 	if asama == "cozum" and _faz == 2:
@@ -786,6 +899,12 @@ func _draw() -> void:
 			draw_circle(p + Vector2(2, 2), 6, Color(0, 0, 0, 0.3))
 			if tp.tur == "demir":
 				draw_texture_rect(top_doku, Rect2(p - Vector2(6, 6), Vector2(12, 12)), false)
+			elif tp.tur == "harpun":
+				# Harpun: ipli mızrak
+				var yonu: Vector2 = (tp.son - tp.bas).normalized()
+				draw_line(tp.bas, p, Color(0.95, 0.9, 0.75, 0.6), 1.5)
+				draw_line(p - yonu * 14.0, p + yonu * 6.0, Color(0.55, 0.38, 0.2), 3.0)
+				draw_colored_polygon(PackedVector2Array([p + yonu * 13.0, p + yonu * 4.0 + yonu.orthogonal() * 4.0, p + yonu * 4.0 - yonu.orthogonal() * 4.0]), Color(0.8, 0.82, 0.88))
 			else:
 				if tp.tur == "ates":
 					draw_circle(p, 10.0, Color(1, 0.6, 0.2, 0.35))
@@ -811,7 +930,9 @@ func _draw() -> void:
 	_sol_sutun()
 	_alt_cubuk()
 	_sag_bilgi(ekran)
-	if _mesaj_sure > 0.0:
+	if asama == "son" or asama == "bitti":
+		_ozet_ciz()
+	elif _mesaj_sure > 0.0:
 		var a := clampf(_mesaj_sure / 0.4, 0.0, 1.0)
 		var r := Rect2(TAHTA.x, TAHTA.y + N * C * 0.42, N * C, 70)
 		draw_rect(r, Color(0, 0, 0, 0.55 * a))
@@ -828,7 +949,7 @@ func _ust_cubuk() -> void:
 	_cubuk(Rect2(TAHTA.x, 50, 200, 8), gemi.su / 100.0, Color(0.3, 0.6, 0.95))
 	_yazi(Vector2(TAHTA.x + 150, 24), str(int(gemi.govde)), 16)
 	var sag_x := TAHTA.x + N * C - 200
-	var ad := "Korsan " + str(korsan.get("ad", ""))
+	var ad := ("" if canavar_mi else "Korsan ") + str(korsan.get("ad", ""))
 	_yazi(Vector2(sag_x, 24), ad, 17, Color(1, 0.7, 0.6))
 	_cubuk(Rect2(sag_x, 32, 200, 14), rakip.can / rakip.can_max, Color(0.9, 0.35, 0.3))
 	# Süre halkası
@@ -849,14 +970,22 @@ func _sol_sutun() -> void:
 	_yazi(Vector2(10, 342), "x" + str(gemi.hareket), 22, Color(0.95, 0.9, 0.6))
 	_yazi(Vector2(10, 376), "Gülle", 16, Color(0.85, 0.78, 0.65))
 	var i := 0
-	for m in ["demir", "zincir", "ates"]:
-		var r := Rect2(8, 384 + i * 58, 92, 52)
+	for m in MERMILER:
+		var r := Rect2(8, 384 + i * 52, 92, 47)
 		_buton(r, "", "mermi_" + m, m == secili_mermi)
-		draw_circle(r.position + Vector2(16, 26), 9, MERMI_RENK[m])
-		_yazi(r.position + Vector2(30, 22), MERMI_ADI[m], 15)
-		_yazi(r.position + Vector2(30, 42), "x" + str(gemi.mermi[m]), 16, Color(1, 0.88, 0.45))
+		draw_circle(r.position + Vector2(16, 24), 9, MERMI_RENK[m])
+		_yazi(r.position + Vector2(30, 20), MERMI_ADI[m], 15)
+		_yazi(r.position + Vector2(30, 39), "x" + str(gemi.mermi[m]), 16, Color(1, 0.88, 0.45))
 		i += 1
-	var y := 572.0
+	# Kanca: rakibe bitişikken rampa düellosu başlatır
+	if not canavar_mi:
+		var kr := Rect2(8, 596, 92, 46)
+		var olur := kanca_mumkun()
+		if olur:
+			var parla := 0.5 + 0.5 * sin(_zaman * 6.0)
+			draw_rect(kr.grow(4), Color(1, 0.85, 0.3, 0.35 * parla))
+		_buton(kr, "Kanca", "kanca", olur, not olur)
+	var y := 662.0
 	if int(oyuncu.yirtik) > 0:
 		_yazi(Vector2(10, y), "Yelken yırtık!", 14, Color(1, 0.6, 0.5))
 		y += 20
@@ -911,7 +1040,7 @@ func _sag_bilgi(ekran: Vector2) -> void:
 	var x := TAHTA.x + N * C + 70
 	if ekran.x - x < 300:
 		return
-	var r := Rect2(x, 72, ekran.x - x - 24, 420)
+	var r := Rect2(x, 72, ekran.x - x - 24, 500)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.17, 0.11, 0.07, 0.92)
 	sb.set_corner_radius_all(12)
@@ -926,9 +1055,51 @@ func _sag_bilgi(ekran: Vector2) -> void:
 		"Ok kareleri iter, girdap döndürüp fırlatır,",
 		"kayalar gövdeye zarar verir.",
 		"",
+		"Bitişikken Kanca: rampa düellosu başlar.",
+		"Kenardan dışarı sür: savaştan kaç.",
+		"Harpun canavarlara 4 kat işler.",
+		"",
 		"Jeton: Yelken  ·  Gülle: Top",
 		"Gövdeyi Tamir, suyu Pompa ile koru!",
 	]
-	_yazi(r.position + Vector2(18, 36), "Deniz Savaşı", 26, Color(1, 0.85, 0.4))
+	_yazi(r.position + Vector2(18, 36), "Canavar Avı" if canavar_mi else "Deniz Savaşı", 26, Color(1, 0.85, 0.4))
 	for i in satirlar.size():
 		_yazi(r.position + Vector2(18, 76 + i * 30), satirlar[i], 17, Color(0.92, 0.86, 0.74))
+
+
+## Savaş sonu özet kartı: sonuç, ganimet, atış/isabet ve kalan gövde.
+func _ozet_ciz() -> void:
+	var r := Rect2(TAHTA.x + 62, TAHTA.y + 120, N * C - 124, 300)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.17, 0.11, 0.07, 0.95)
+	sb.border_color = Color(1, 0.85, 0.4)
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(16)
+	sb.shadow_size = 12
+	sb.shadow_color = Color(0, 0, 0, 0.5)
+	draw_style_box(sb, r)
+	var baslik: String = {"zafer": "ZAFER!", "yenilgi": "YENİLGİ", "kacis": "KAÇTIN"}.get(sonuc, "")
+	if sonuc == "zafer" and canavar_mi:
+		baslik = "AV TAMAM!"
+	elif sonuc == "zafer" and _teslim:
+		baslik = "TESLİM OLDULAR!"
+	var renk := Color(1, 0.85, 0.35) if sonuc == "zafer" else (Color(0.95, 0.45, 0.4) if sonuc == "yenilgi" else Color(0.6, 0.85, 1.0))
+	var bf := ThemeDB.fallback_font
+	var s := bf.get_string_size(baslik, HORIZONTAL_ALIGNMENT_LEFT, -1, 40)
+	var bp := r.position + Vector2((r.size.x - s.x) / 2.0, 56)
+	draw_string_outline(bf, bp, baslik, HORIZONTAL_ALIGNMENT_LEFT, -1, 40, 8, Color(0.1, 0.04, 0.02))
+	draw_string(bf, bp, baslik, HORIZONTAL_ALIGNMENT_LEFT, -1, 40, renk)
+	var oa: int = istatistik.oyuncu_atis
+	var oi: int = istatistik.oyuncu_isabet
+	var satirlar := [
+		["Rakip", str(korsan.get("ad", ""))],
+		["Tur", str(tur)],
+		["Atış / isabet", "%d / %d  (%%%d)" % [oa, oi, int(100.0 * oi / maxf(1.0, oa))]],
+		["Aldığın isabet", str(istatistik.rakip_isabet)],
+		["Kalan gövde", str(int(gemi.govde))],
+		["Ganimet", str(ganimet) + " altın"],
+	]
+	for i in satirlar.size():
+		var y := r.position.y + 100 + i * 31
+		_yazi(Vector2(r.position.x + 30, y), satirlar[i][0], 19, Color(0.85, 0.78, 0.65))
+		_yazi(Vector2(r.position.x + 210, y), satirlar[i][1], 19, Color(1, 0.88, 0.45) if i == 5 else Color(1, 0.95, 0.84))
